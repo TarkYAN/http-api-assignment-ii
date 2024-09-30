@@ -1,13 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <title>Our simple HTTP server</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
-  
-  <script>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('userForm').onsubmit = (e) => {
+        e.preventDefault(); // Prevent form submission
+
+        const url = document.getElementById('urlField').value; 
+        const method = document.getElementById('methodSelect').value.toUpperCase(); 
+
+        fetch(url, { method })
+          .then((response) => {
+            if (method === 'HEAD') {
+              if (response.status === 404) {
+                document.getElementById('content').innerHTML = `
+                            <strong>Not Found</strong><br>
+                        `;
+              } else {
+                document.getElementById('content').innerHTML = `
+                            <strong>Success</strong><br>
+                        `;
+              }
+              return;
+            }
+            return response.json().then(data => ({ data, status: response.status }));
+          })
+          .then((result) => {
+            // Ensure result exists before destructuring
+            if (result) {
+              const { data, status } = result;
+
+              if (status === 404) {
+                const errorMessage = {
+                  message: data.message || 'The page you are looking for was not found.',
+                  id: 'notFound'
+                };
+
+                console.error('404 Not Found:', errorMessage); 
+                document.getElementById('content').innerHTML = `<strong>Not Found</strong><br><pre>${JSON.stringify(errorMessage, null, 2)}</pre>`;
+                return; 
+              }
+
+              console.log(data.users);
+              document.getElementById('content').innerHTML = `<strong>Success</strong><br>${JSON.stringify(data.users, null, 2)}`;
+            }
+          })
+          .catch((error) => {
+            console.error('Fetch error:', error);
+            document.getElementById('content').innerHTML = `{ "message": "${error.message}", "id": "fetchError" }`;
+          });
+      };
+
+      
+      document.getElementById('nameForm').onsubmit = (e) => {
+        e.preventDefault(); // Prevent form submission
+
+        const name = document.getElementById('nameField').value;
+        const age = document.getElementById('ageField').value;
+
+        const formData = new URLSearchParams();
+        formData.append('name', name);
+        formData.append('age', age);
+
+        // Send POST request to /addUser
+        fetch('/addUser', {
+          method: 'POST',
+          body: formData,
+        })
+          .then((response) => {
+            // Handle different status codes
+            if (response.status === 201) {
+              return response.json().then(data => ({ data, status: response.status }));
+            }
+            
+            else if (response.status === 204) {
+              return { status: 204 }; 
+            }
+            
+            else if (response.status === 400) {
+              return response.json().then(data => ({ data, status: 400 }));
+            }
+            else {
+              throw new Error(`Error: ${response.status}`);
+            }
+          })
+          .then((data) => {
+            // Handle 201 status (new user created)
+            if (data && data.status === 201) {
+              const successMessage = {
+                headMessage: 'Created',
+                message: 'Created Successfully'
+              };
+
+              
+              console.log(successMessage);
+
+              
+              document.getElementById('content').innerHTML = `<strong>${successMessage.headMessage}</strong><br>Message: ${successMessage.message}`;
+            }
+            // Handle 204 status (existing user updated)
+            else if (data && data.status === 204) {
+
+              
+              document.getElementById('content').innerHTML = `<strong>Updated (No Content)</strong><br>`;
+            }
+            // Handle 400 status (missing parameters)
+            else if (data && data.status === 400) {
+              const errorMessage = {
+                message: data.data.message,
+                id: data.data.id
+              };
+
+              
+              console.log(errorMessage);
+
+              
+              document.getElementById('content').innerHTML = `<strong>Bad Request</strong><br>Message: ${errorMessage.message}`;
+            }
+          })
+          .catch((error) => {
+            console.error('Fetch error:', error); 
+            document.getElementById('content').innerHTML = `{Message: "${error.message}", "id": "fetchError" }`;
+          });
+      };
+    });
   </script>
 </head>
+
 <body>
   <section id="top">
     <h3>POST Status Code Tests</h3>
@@ -15,7 +138,7 @@
       <label for="name">Name: </label>
       <input id="nameField" type="text" name="name" />
       <label for="age">Age: </label>
-      <input id="ageField" type="number" name="age" min="0" max="100" step="1"/>
+      <input id="ageField" type="number" name="age" min="0" max="100" step="1" />
       <input type="submit" value="Add User" />
     </form>
     <form id="userForm" action="/getUsers" method="get">
@@ -33,4 +156,5 @@
   <section id="content">
   </section>
 </body>
+
 </html>
